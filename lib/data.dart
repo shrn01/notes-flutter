@@ -13,11 +13,12 @@ class NoteModel {
   NoteModel(this.title, this.body, this.noteColor);
 
   Map<String, dynamic> toMap() {
-    Map<String, dynamic> myNote;
+    Map<String, dynamic> myNote = {};
     myNote['title'] = this.title;
     myNote['body'] = this.body;
-    myNote['noteColor'] = this.noteColor.toString();
+    myNote['noteColor'] = this.noteColor.value;
     myNote['isArchived'] = this.isArchived;
+    // print(myNote);
     return myNote;
   }
 }
@@ -25,35 +26,56 @@ class NoteModel {
 class NoteProvider {
   static Database db;
 
-  static Future open() async {
-    db = await openDatabase(join(await getDatabasesPath(), 'mynotes837.db'),
-        version: 1, onCreate: (Database db, int version) async {
-      db.execute('''
+  static Future init() async {
+    db = await openDatabase(
+      join(await getDatabasesPath(), 'mynotes837.db'),
+      version: 1,
+      onCreate: (Database db, int version) async {
+        db.execute('''
         create table Notes(
           id integer primary key autoincrement,
           title text,
           body text,
-          noteColor text,
-          isArchived int,
-        );
-          ''');
-    });
+          noteColor integer,
+          isArchived integer
+        )''');
+      },
+    );
   }
 
-  static Future<List<Map<dynamic, dynamic>>> getNotesList() async {
+  static Future deleteDb() async {
+    await deleteDatabase(
+      join(await getDatabasesPath(), 'mynotes837.db'),
+    );
+    db = null;
+  }
+
+  static Future<List<Map<dynamic, dynamic>>> getNotes() async {
     if (db == null) {
-      await open();
+      await init();
     }
     return await db.query('Notes');
   }
 
   static Future<void> insert(Map<dynamic, dynamic> note) async {
-    print('Was here');
-    await db.insert('Notes', note);
+    // print(db);
+    if (db == null) {
+      await init();
+    }
+    // print(db);
+    // print('Was here');
+    await db.insert(
+      'Notes',
+      note,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
     return;
   }
 
   static Future<void> update(Map<dynamic, dynamic> note) async {
+    if (db == null) {
+      await init();
+    }
     await db.update(
       'Notes',
       note,
@@ -64,11 +86,13 @@ class NoteProvider {
   }
 
   static Future<void> delete(int id) async {
+    if (db == null) {
+      await init();
+    }
     await db.delete(
       'Notes',
       where: 'id = ?',
       whereArgs: [id],
     );
-    return;
   }
 }

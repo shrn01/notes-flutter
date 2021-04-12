@@ -79,8 +79,7 @@ class _HomeState extends State<Home> {
           Icons.add,
           color: Colors.black,
         ),
-        onPressed: () {
-          print(NoteProvider.getNotesList());
+        onPressed: () async {
           Navigator.pushNamed(context, '/add');
         },
       ),
@@ -99,41 +98,52 @@ class _HomeState extends State<Home> {
   }
 }
 
+// ignore: must_be_immutable
 class NotesList extends StatelessWidget {
   NotesList({
     Key key,
   }) : super(key: key);
 
-  final Map<dynamic, dynamic> notes = {
-    0: {
-      'head': "Dobby",
-      'body':
-          "\"Such a beautiful place... to be with friends.\" It's difficult to not get a bit misty-eyed recalling the moment when Dobby the house-elf said those words in Deathly Hallows Part 1, which were among his last. When we met Dobby, admittedly, he was pretty annoying. ",
-    },
-    1: {
-      'head': "Luna",
-      'body':
-          "\"I know she's insane, but it's in a good way.\" Ron Weasley's characterization of Luna Lovegood is precisely what makes this \"Looney\" Ravenclaw girl such a delight. She's an offbeat type with an interest in the macabre. And really, it's not surprising that she's a little strange when you consider that her mother died in a tragic magical accident when ",
-    },
-    2: {
-      'head': "Sirius",
-      'body':
-          "\"Have you seen this wizard?\" \"Approach with extreme caution!\" \"Notify immediately by owl the Ministry of Magic.\" So read the wanted posters plastered everywhere in the wizarding world upon Sirius Black's escape from Azkaban prison,",
-    },
-    3: {
-      'head': "Hermione",
-      'body':
-          "Hermione Granger, Harry Potter and Ron Weasley's best girl-pal, is so much more than just a token throw-in for female readers/viewers to identify with. In fact, she narrowly edges out Ron for second place on our list.",
-    }
-  };
+  Future<List<Map<dynamic, dynamic>>> notez = NoteProvider.getNotes();
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-        itemCount: notes.length,
-        itemBuilder: (context, i) {
-          return Note(head: notes[i]['head'], body: notes[i]['body']);
-        });
+    return FutureBuilder(
+      future: notez,
+      builder: (context, snapshot) {
+        // print(snapshot.data);
+        if (snapshot.hasData)
+          return ListView.builder(
+            itemCount: snapshot.data.length + 1,
+            itemBuilder: (context, i) {
+              if (i < snapshot.data.length) {
+                return Note(
+                  head: snapshot.data[i]['title'],
+                  body: snapshot.data[i]['body'],
+                  color: Color(snapshot.data[i]['noteColor']),
+                );
+              } else {
+                return InkWell(
+                  child: SizedBox(
+                    height: 30.0,
+                    child: Container(
+                      child: Center(
+                        child: Text("Archived"),
+                      ),
+                    ),
+                  ),
+                );
+              }
+            },
+          );
+        else
+          return Container(
+            child: Center(
+              child: Text("Loading"),
+            ),
+          );
+      },
+    );
   }
 }
 
@@ -142,9 +152,12 @@ class Note extends StatelessWidget {
     Key key,
     @required this.head,
     this.body,
+    this.color,
   }) : super(key: key);
+
   final head;
   final body;
+  final color;
   final bodyStyle = TextStyle(
     fontSize: 18.0,
   );
@@ -155,10 +168,6 @@ class Note extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var random = Random();
-    var red = random.nextInt(80) + 170;
-    var green = random.nextInt(80) + 170;
-    var blue = random.nextInt(80) + 170;
     return Container(
       margin: EdgeInsets.fromLTRB(15, 15, 15, 3),
       padding: EdgeInsets.all(15.0),
@@ -185,7 +194,7 @@ class Note extends StatelessWidget {
         borderRadius: BorderRadius.all(
           Radius.circular(10.0),
         ),
-        color: Color.fromRGBO(red, green, blue, 1.0),
+        color: color,
       ),
     );
   }
@@ -207,7 +216,7 @@ class _AddNoteState extends State<AddNote> {
     return Color.fromRGBO(red, green, blue, 1.0);
   }
 
-  Color background = Colors.white;
+  Color background = Colors.grey[200];
   String title = '';
   String body = '';
 
@@ -232,16 +241,16 @@ class _AddNoteState extends State<AddNote> {
             leading: new IconButton(
               icon: new Icon(Icons.arrow_back),
               onPressed: () {
-                print(title);
-                print(body);
-                print(background);
+                // print(title);
+                // print(body);
+                // print(background);
                 NoteModel note = NoteModel(
                   title,
                   body,
                   background,
                 );
-                print(note);
-                print(note.toMap());
+                // print(note);
+                // print(note.toMap());
                 if (title != '' && body != '') {
                   NoteProvider.insert(note.toMap());
                 }
@@ -251,11 +260,15 @@ class _AddNoteState extends State<AddNote> {
             actions: <Widget>[
               IconButton(
                 icon: Icon(Icons.delete_outline),
-                onPressed: () {},
+                onPressed: () {
+                  // NoteProvider.delete();
+                },
               ),
               IconButton(
                 icon: Icon(Icons.archive_outlined),
-                onPressed: () {},
+                onPressed: () {
+                  // NoteProvider.update();
+                },
               )
             ],
             iconTheme: IconThemeData(

@@ -54,7 +54,14 @@ class NoteProvider {
     if (db == null) {
       await init();
     }
-    return await db.query('Notes');
+    return await db.rawQuery('SELECT * FROM Notes WHERE isArchived=?', [0]);
+  }
+
+  static Future<List<Map<dynamic, dynamic>>> getArchived() async {
+    if (db == null) {
+      await init();
+    }
+    return await db.rawQuery('SELECT * FROM Notes WHERE isArchived=?', [1]);
   }
 
   static Future<void> insert(Map<dynamic, dynamic> note) async {

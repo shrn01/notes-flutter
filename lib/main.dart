@@ -1,7 +1,10 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'data.dart';
+import 'components/addnote.dart';
+import 'components/edit.dart';
+import 'components/note.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 void main() {
   runApp(MyApp());
@@ -16,10 +19,13 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Poppins',
         primaryColor: Colors.black,
       ),
-      initialRoute: '/add',
+      initialRoute: '/',
       routes: {
         '/': (context) => Home(),
         '/add': (context) => AddNote(),
+        '/edit': (context) => EditNote(
+              arguments: ModalRoute.of(context).settings.arguments,
+            ),
       },
     );
   }
@@ -36,18 +42,52 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   int _selectedIndex = 0;
+  bool isList = true;
+  Future<List<Map<dynamic, dynamic>>> notez = NoteProvider.getNotes();
+  Future<List<Map<dynamic, dynamic>>> archived = NoteProvider.getArchived();
+  refresh() {
+    setState(() {
+      notez = NoteProvider.getNotes();
+      archived = NoteProvider.getArchived();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        brightness: Brightness.dark,
+        actions: [
+          IconButton(
+              icon: isList ? Icon(Icons.list) : Icon(Icons.grid_on_rounded),
+              onPressed: () {
+                setState(() {
+                  isList = !isList;
+                });
+              }),
+          IconButton(
+              icon: Icon(
+                Icons.info_outline,
+              ),
+              onPressed: () {
+                showAboutDialog(
+                    applicationIcon: Icon(
+                      Icons.notes,
+                      size: 40.0,
+                    ),
+                    applicationName: "Notes",
+                    context: context,
+                    applicationVersion: '1.0.1',
+                    children: <Widget>[Text("Made with <3 by shrn")]);
+              })
+        ],
         centerTitle: true,
         title: Text(
-          "Note.js",
+          "Notes",
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        elevation: 10.0,
+        elevation: 20.0,
         items: [
           BottomNavigationBarItem(
             icon: Icon(
@@ -57,9 +97,9 @@ class _HomeState extends State<Home> {
           ),
           BottomNavigationBarItem(
             icon: Icon(
-              Icons.settings,
+              Icons.archive,
             ),
-            label: "Settings",
+            label: "Archived",
           ),
         ],
         currentIndex: _selectedIndex,
@@ -73,6 +113,7 @@ class _HomeState extends State<Home> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: FloatingActionButton(
+        elevation: 4.0,
         backgroundColor: Colors.white,
         heroTag: 'addNote',
         child: Icon(
@@ -80,16 +121,24 @@ class _HomeState extends State<Home> {
           color: Colors.black,
         ),
         onPressed: () async {
-          Navigator.pushNamed(context, '/add');
+          await Navigator.pushNamed(context, '/add');
+          // print(returned);
+          refresh();
         },
       ),
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
           children: <Widget>[
-            NotesList(),
-            Center(
-              child: Text("In Settings"),
+            NotesList(
+              isList: isList,
+              notez: notez,
+              refresh: refresh,
+            ),
+            NotesList(
+              isList: isList,
+              notez: archived,
+              refresh: refresh,
             ),
           ],
         ),
@@ -99,245 +148,90 @@ class _HomeState extends State<Home> {
 }
 
 // ignore: must_be_immutable
-class NotesList extends StatelessWidget {
+class NotesList extends StatefulWidget {
   NotesList({
     Key key,
+    this.isList,
+    this.notez,
+    this.refresh,
   }) : super(key: key);
+  bool isList;
+  final notez;
+  final Function() refresh;
+  @override
+  _NotesListState createState() => _NotesListState();
+}
 
-  Future<List<Map<dynamic, dynamic>>> notez = NoteProvider.getNotes();
-
+class _NotesListState extends State<NotesList> {
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: notez,
-      builder: (context, snapshot) {
-        // print(snapshot.data);
-        if (snapshot.hasData)
-          return ListView.builder(
-            itemCount: snapshot.data.length + 1,
-            itemBuilder: (context, i) {
-              if (i < snapshot.data.length) {
-                return Note(
-                  head: snapshot.data[i]['title'],
-                  body: snapshot.data[i]['body'],
-                  color: Color(snapshot.data[i]['noteColor']),
-                );
-              } else {
-                return InkWell(
-                  child: SizedBox(
-                    height: 30.0,
-                    child: Container(
-                      child: Center(
-                        child: Text("Archived"),
-                      ),
-                    ),
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: 15.0,
+        vertical: 0.0,
+      ),
+      child: FutureBuilder(
+        future: widget.notez,
+        builder: (context, snapshot) {
+          // print(snapshot.data);
+          if (snapshot.hasData) {
+            List myList = snapshot.data;
+            // print(snapshot.data);
+            if (myList.length != 0) {
+              if (!widget.isList)
+                return ListView.builder(
+                  padding: EdgeInsets.only(
+                    bottom: 15.0,
                   ),
+                  itemCount: snapshot.data.length,
+                  itemBuilder: (context, i) {
+                    // print(snapshot.data);
+                    return Note(
+                      id: snapshot.data[i]['id'],
+                      head: snapshot.data[i]['title'],
+                      body: snapshot.data[i]['body'],
+                      color: snapshot.data[i]['noteColor'],
+                      isArchived: snapshot.data[i]['isArchived'],
+                      refresh: widget.refresh,
+                    );
+                  },
                 );
-              }
-            },
-          );
-        else
-          return Container(
-            child: Center(
-              child: Text("Loading"),
-            ),
-          );
-      },
-    );
-  }
-}
-
-class Note extends StatelessWidget {
-  Note({
-    Key key,
-    @required this.head,
-    this.body,
-    this.color,
-  }) : super(key: key);
-
-  final head;
-  final body;
-  final color;
-  final bodyStyle = TextStyle(
-    fontSize: 18.0,
-  );
-  final headStyle = TextStyle(
-    fontSize: 22.0,
-    fontWeight: FontWeight.bold,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.fromLTRB(15, 15, 15, 3),
-      padding: EdgeInsets.all(15.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          // if(head){
-          Text(
-            head,
-            textAlign: TextAlign.left,
-            style: headStyle,
-          ),
-          SizedBox(
-            height: 8.0,
-          ),
-          Text(
-            body,
-            textAlign: TextAlign.justify,
-            style: bodyStyle,
-          ),
-        ],
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.all(
-          Radius.circular(10.0),
-        ),
-        color: color,
-      ),
-    );
-  }
-}
-
-class AddNote extends StatefulWidget {
-  @override
-  _AddNoteState createState() => _AddNoteState();
-}
-
-class _AddNoteState extends State<AddNote> {
-  Color getColor() {
-    var random = Random();
-    var red = random.nextInt(80) + 170;
-    var green = random.nextInt(80) + 170;
-    var blue = random.nextInt(80) + 170;
-
-    // print(Color.fromRGBO(red, green, blue, 1.0));
-    return Color.fromRGBO(red, green, blue, 1.0);
-  }
-
-  Color background = Colors.grey[200];
-  String title = '';
-  String body = '';
-
-  @override
-  Widget build(BuildContext context) {
-    List<Color> myColors = [
-      getColor(),
-      getColor(),
-      getColor(),
-      getColor(),
-      getColor(),
-      getColor(),
-      getColor(),
-      getColor(),
-    ];
-    return Container(
-      child: Hero(
-        tag: "addNote",
-        child: Scaffold(
-          backgroundColor: background,
-          appBar: AppBar(
-            leading: new IconButton(
-              icon: new Icon(Icons.arrow_back),
-              onPressed: () {
-                // print(title);
-                // print(body);
-                // print(background);
-                NoteModel note = NoteModel(
-                  title,
-                  body,
-                  background,
+              else
+                return StaggeredGridView.countBuilder(
+                  padding: EdgeInsets.only(
+                    bottom: 15.0,
+                  ),
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 15.0,
+                  itemCount: snapshot.data.length,
+                  staggeredTileBuilder: (int index) {
+                    return StaggeredTile.fit(1);
+                  },
+                  itemBuilder: (context, i) {
+                    return Note(
+                      id: snapshot.data[i]['id'],
+                      head: snapshot.data[i]['title'],
+                      body: snapshot.data[i]['body'],
+                      color: snapshot.data[i]['noteColor'],
+                      isArchived: snapshot.data[i]['isArchived'],
+                      refresh: widget.refresh,
+                    );
+                  },
                 );
-                // print(note);
-                // print(note.toMap());
-                if (title != '' && body != '') {
-                  NoteProvider.insert(note.toMap());
-                }
-                Navigator.pop(context);
-              },
-            ),
-            actions: <Widget>[
-              IconButton(
-                icon: Icon(Icons.delete_outline),
-                onPressed: () {
-                  // NoteProvider.delete();
-                },
+            } else {
+              return Container(
+                child: Center(
+                  child: Text("Feels Pretty Empty here!"),
+                ),
+              );
+            }
+          } else
+            return Container(
+              child: Center(
+                child: Text("Loading"),
               ),
-              IconButton(
-                icon: Icon(Icons.archive_outlined),
-                onPressed: () {
-                  // NoteProvider.update();
-                },
-              )
-            ],
-            iconTheme: IconThemeData(
-              color: Colors.black,
-            ),
-            centerTitle: true,
-            elevation: 0.0,
-            title: Text(
-              'Add',
-              style: TextStyle(color: Colors.black),
-            ),
-            backgroundColor: Colors.transparent,
-          ),
-          body: SafeArea(
-            child: Column(
-              children: <Widget>[
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(25.0, 20.0, 20.0, 0.0),
-                    child: ListView(
-                      children: [
-                        TextField(
-                          onChanged: (text) {
-                            title = text;
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Title',
-                          ),
-                        ),
-                        TextField(
-                          maxLines: null,
-                          keyboardType: TextInputType.multiline,
-                          onChanged: (text) {
-                            body = text;
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Body',
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 50.0,
-                  child: Row(
-                    children: <Widget>[
-                      for (var myColor in myColors)
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              setState(() {
-                                background = myColor;
-                                // print(background);
-                              });
-                            },
-                            child: Container(
-                              color: myColor,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+            );
+        },
       ),
     );
   }
